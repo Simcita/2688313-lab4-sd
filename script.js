@@ -1,63 +1,66 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.querySelector('form');
-    const countryInput = document.querySelector('#country');
-    const resultDiv = document.querySelector('#result');
+document.getElementById('search-btn').addEventListener('click', fetchCountryData);
 
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const countryName = countryInput.value.trim();
-        if (!countryName) {
-            displayError('Please enter a country name.');
-            return;
-        }
+async function fetchCountryData() {
+    const countryName = document.getElementById('country-input').value.trim();
+    const countryInfoSection = document.getElementById('country-info');
+    const borderingCountriesSection = document.getElementById('bordering-countries');
+    const errorMessage = document.getElementById('error-message');
 
-        try {
-            const response = await fetch(`https://restcountries.com/v3.1/name/${countryName}`);
-            if (!response.ok) {
-                throw new Error('Country not found');
-            }
-            const data = await response.json();
-            const country = data[0];
-            const neighbors = await fetchNeighbors(country.borders);
-
-            displayCountryInfo(country, neighbors);
-        } catch (error) {
-            displayError(error.message);
-        }
-    });
-
-    async function fetchNeighbors(borders) {
-        if (!borders || borders.length === 0) {
-            return [];
-        }
-        const response = await fetch(`https://restcountries.com/v3.1/alpha?codes=${borders.join(',')}`);
-        const data = await response.json();
-        return data.map(country => ({
-            name: country.name.common,
-            flag: country.flags.png
-        }));
+    if (!countryName) {
+        errorMessage.textContent = "Please enter a country name.";
+        return;
     }
 
-    function displayCountryInfo(country, neighbors) {
-        resultDiv.innerHTML = `
+    errorMessage.textContent = "";
+    countryInfoSection.innerHTML = "";
+    borderingCountriesSection.innerHTML = "";
+
+    try {
+        // Fetch country data
+        const response = await fetch(`https://restcountries.com/v3.1/name/${countryName}?fullText=true`);
+        if (!response.ok) {
+            throw new Error("Country not found. Please try again.");
+        }
+        
+        const countryData = await response.json();
+        const country = countryData[0];
+
+        // Extract country information
+        const capital = country.capital ? country.capital[0] : "No capital";
+        const population = country.population.toLocaleString();
+        const region = country.region;
+        const flagURL = country.flags.png;
+        const borders = country.borders || [];
+
+        // Display country info
+        countryInfoSection.innerHTML = `
             <h2>${country.name.common}</h2>
-            <p><strong>Capital:</strong> ${country.capital}</p>
-            <p><strong>Population:</strong> ${country.population}</p>
-            <p><strong>Region:</strong> ${country.region}</p>
-            <img src="${country.flags.png}" alt="Flag of ${country.name.common}" width="100">
-            <h3>Neighbouring Countries:</h3>
-            <ul>
-                ${neighbors.map(neighbor => `
-                    <li>
-                        <img src="${neighbor.flag}" alt="Flag of ${neighbor.name}" width="50">
-                        ${neighbor.name}
-                    </li>
-                `).join('')}
-            </ul>
+            <img src="${flagURL}" alt="Flag of ${country.name.common}">
+            <p>Capital: ${capital}</p>
+            <p>Population ${population}</p>
+            <p>Region: ${region}</p>
         `;
-    }
 
-    function displayError(message) {
-        resultDiv.innerHTML = `<p class="error">${message}</p>`;
+        // Fetch bordering countries if they exist
+        if (borders.length > 0) {
+            borderingCountriesSection.innerHTML = "<h3>Bordering Countries:</h3>";
+
+            for (const border of borders) {
+                const borderResponse = await fetch(`https://restcountries.com/v3.1/alpha/${border}`);
+                const borderData = await borderResponse.json();
+                const borderCountry = borderData[0];
+
+                borderingCountriesSection.innerHTML += `
+                    <div>
+                        <p>${borderCountry.name.common}</p>
+                        <img src="${borderCountry.flags.png}" alt="Flag of ${borderCountry.name.common}">
+                    </div>
+                `;
+            }
+        } else {
+            borderingCountriesSection.innerHTML = "<p>No bordering countries.</p>";
+        }
+    } catch (error) {
+        errorMessage.textContent = error.message;
     }
-});
+}
